@@ -1,0 +1,164 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+ <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>scatter plot</title>
+    <!-- <link href="layout.css" rel="stylesheet" type="text/css"> -->
+    <style type="text/css">
+    body {
+      font-family: sans-serif;
+      font-size: 16px;
+      margin: 50px;
+      max-width: 800px;
+    } </style>
+    <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
+    <script language="javascript" type="text/javascript" src="../js/jquery-1.7.2.js"></script>
+    <script language="javascript" type="text/javascript" src="../flot/jquery.flot.js"></script>
+    <script language="javascript" type="text/javascript" src="../flot/jquery.flot.selection.js"></script>
+    </head>
+    <body>
+    <h2>Scatter plot: Tag frequency vs Informativeness</h2>
+
+    <table width=900>
+        <tr>
+            <td rowspan="5">
+                <div id="placeholder" style="width:600px;height:500px"></div>
+            </td>
+            <td><div id="overview" style="width:200px;height:150px"></div>
+            </td>
+        </tr>
+        <tr><td><span id="datacount">0</span> tags loaded.</td></tr>
+        <tr><td><p><input id="enableTooltip" type="checkbox">Enable tooltip</p></td></tr>
+        <tr><td><span id="clickdata"></span></p></td></tr>
+        <tr>
+            <td>
+                <p id="hoverdata">Mouse hovers at
+                (<span id="x">0</span>, <span id="y">0</span>).
+            </td>
+        </tr>
+        </tr>
+    
+    </table>
+    
+    <p>Try
+    pointing and clicking on the points.</p>
+
+    <p>A tooltip is easy to build with a bit of jQuery code and the
+    data returned from the plot.</p>
+
+
+<script type="text/javascript">
+$(function () {
+    var wordinfo = [];
+    var prcdata = [];
+
+    var xyoptions = { xaxis: {
+                        min: 5,
+                        //max: 200000,
+                        ticks: [10,100, 1000, 10000, 1e5],
+                        transform:  function(v) {return Math.log(v+1e-4); /*move away from zero*/} , 
+                        inverseTransform: function (v) { return Math.exp(v); },
+                        tickDecimals: 0 ,
+                    } ,
+                    yaxis: { 
+                        min: 0.35,
+                        max: 4.1,
+                        transform:  function(v) {return Math.log(v); /*move away from zero*/} , 
+                        inverseTransform: function (v) { return Math.exp(v); },
+                        tickDecimals: 2,
+                    } } ;
+    // get data and setup graph
+    $.getJSON('wordnet_tag.json', function(data) {
+        //var items = [];
+
+        $.each(data, function(key, val) {
+            //items.push('<li id="' + key + '">' + val['word'] + ": "+ val['x'][0] + '</li>');
+            prcdata.push( [val['cnt'], val['ifm']] ) ;
+            wordinfo.push( [val['word'], val['cnt'], val['ifm']] );
+
+        });
+
+        //console.log(wordinfo);
+        var cur_opt = {
+           series: {
+               points: { show: true }
+           },
+           grid: { hoverable: true, clickable: true },
+           selection: { mode: "xy" },
+        } ;
+        var placeholder = $.plot($("#placeholder"), 
+            [{data: prcdata, label: "tags", color: 2}] , jQuery.extend(cur_opt, xyoptions));
+
+        $("#datacount").text(wordinfo.length);
+
+        // setup overview
+        var over_opt = {
+            legend: { show: true, container: $("#overviewLegend") },
+            series: {
+                points: { show: true, size: 1 },
+                shadowSize: 0
+            },
+            grid: { color: "#999" },
+            selection: { mode: "xy" }
+        } ;
+        var overview = $.plot($("#overview"), 
+            [{data: prcdata, color: 2}] ,  jQuery.extend(over_opt, xyoptions));
+
+    });
+
+
+    // respond to clicking and hovering
+    function showTooltip(x, y, contents) {
+        $('<div id="tooltip">' + contents + '</div>').css( {
+            position: 'absolute',
+            display: 'none',
+            top: y + 5,
+            left: x + 5,
+            border: '1px solid #fdd',
+            padding: '2px',
+            'background-color': '#eee',
+            opacity: 0.80
+        }).appendTo("body").fadeIn(200);
+    } ;
+
+    var previousPoint = null;
+    $("#placeholder").bind("plothover", function (event, pos, item) {
+        $("#x").text(pos.x.toFixed(2));
+        $("#y").text(pos.y.toFixed(2));
+
+        if ($("#enableTooltip:checked").length > 0) {
+            if (item) {
+                if (previousPoint != item.dataIndex) {
+                    previousPoint = item.dataIndex;
+                    var ii = item.dataIndex;
+
+                    $("#tooltip").remove();
+                    //var x = item.datapoint[0].toFixed(2),
+                    //    y = item.datapoint[1].toFixed(2);
+                    var x = wordinfo[ii][1],
+                        y = wordinfo[ii][2];
+                    
+                    showTooltip(item.pageX, item.pageY,
+                                wordinfo[ii][0] + " (" + x + ", " + y +")");
+                }
+            }
+            else {
+                $("#tooltip").remove();
+                previousPoint = null;            
+            }
+        }
+    });
+
+    $("#placeholder").bind("plotclick", function (event, pos, item) {
+        if (item) {
+            var ii = item.dataIndex;
+            $("#clickdata").text(item.series.label + ' "'+ wordinfo[ii][0] + '": (' + wordinfo[ii][1]+", "+ wordinfo[ii][2].toFixed(2) + ") ");
+            //plot.highlight(item.series, item.datapoint);
+        }
+    });
+
+});
+</script>
+
+ </body>
+</html>
