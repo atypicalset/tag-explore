@@ -13,8 +13,10 @@
     } </style>
     <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
     <script language="javascript" type="text/javascript" src="../js/jquery-1.7.2.js"></script>
+    <script language="javascript" type="text/javascript" src="../js/underscore.js"></script>
     <script language="javascript" type="text/javascript" src="../flot/jquery.flot.js"></script>
     <script language="javascript" type="text/javascript" src="../flot/jquery.flot.selection.js"></script>
+    <!--<script language="javascript" type="text/javascript" src="../flot/jquery.flot.navigate.js"></script>-->
     </head>
     <body>
     <h2>Scatter plot: Tag frequency vs Informativeness</h2>
@@ -29,11 +31,12 @@
         </tr>
         <tr><td><span id="datacount">0</span> tags loaded.</td></tr>
         <tr><td><p><input id="enableTooltip" type="checkbox">Enable tooltip</p></td></tr>
-        <tr><td><span id="clickdata"></span></p></td></tr>
+        <tr><td><span id="clickdata"></span></td></tr>
         <tr>
             <td>
                 <p id="hoverdata">Mouse hovers at
-                (<span id="x">0</span>, <span id="y">0</span>).
+                (<span id="x">0</span>, <span id="y">0</span>).</p>
+                <p id="selectdata">selected area has <span id="tagnum">inf</span> points</p>
             </td>
         </tr>
         </tr>
@@ -49,13 +52,13 @@
 
 <script type="text/javascript">
 $(function () {
+    var cgi_path="/tag-explore/cgi-bin/tag_data.py"
     var wordinfo = [];
-    var prcdata = [];
+    var wdata = [];
 
     var xyoptions = { xaxis: {
                         min: 5,
                         //max: 200000,
-                        ticks: [10,100, 1000, 10000, 1e5],
                         transform:  function(v) {return Math.log(v+1e-4); /*move away from zero*/} , 
                         inverseTransform: function (v) { return Math.exp(v); },
                         tickDecimals: 0 ,
@@ -63,10 +66,22 @@ $(function () {
                     yaxis: { 
                         min: 0.35,
                         max: 4.1,
-                        transform:  function(v) {return Math.log(v); /*move away from zero*/} , 
-                        inverseTransform: function (v) { return Math.exp(v); },
                         tickDecimals: 2,
-                    } } ;
+                        transform:  function(v) {return Math.log(v); /*move away from zero*/} , 
+                        inverseTransform: function (v) { return Math.exp(v); }, 
+                    }
+                } ;
+
+    var over_opt = {
+        legend: { show: true, container: $("#overviewLegend") },
+        series: {
+            points: { show: true, size: .5 },
+            shadowSize: 0
+        },
+        grid: { color: "#999" },
+        selection: { mode: "xy" }
+    } ;
+
     var placeholder_opt = {
            series: {
                points: { show: true }
@@ -75,8 +90,35 @@ $(function () {
            selection: { mode: "xy" },
         } ;
     
-    var placeholder;
+    var placeholder; //plot handles
     var overview;
+    var ph_handle = $("#placeholder"); //plot area handle?
+
+    // fetch data with jQuery + python cgi
+    /*
+    function onDataReceived(series) {
+        // extract the first coordinate pair so you can see that
+        // data is now an ordinary Javascript object
+        var firstcoordinate = '(' + series.data[0][0] + ', ' + series.data[0][1] + ')';
+
+        button.siblings('span').text('Fetched ' + series.label + ', first point: ' + firstcoordinate);
+
+        // let's add it to our current data
+        if (!alreadyFetched[series.label]) {
+            alreadyFetched[series.label] = true;
+            data.push(series);
+        }
+        
+        // and plot all we got
+        $.plot(placeholder, data, options);
+     }
+    
+    $.ajax({
+        url: dataurl,
+        method: 'GET',
+        dataType: 'json',
+        success: onDataReceived
+    }); */
 
     // get initial data and setup graph
     $.getJSON('wordnet_tag.json', function(data) {
@@ -84,36 +126,28 @@ $(function () {
 
         $.each(data, function(key, val) {
             //items.push('<li id="' + key + '">' + val['word'] + ": "+ val['x'][0] + '</li>');
-            prcdata.push( [val['cnt'], val['ifm']] ) ;
-            wordinfo.push( [val['word'], val['cnt'], val['ifm']] );
+            wdata.push( [val['cnt'], val['ifm']] ) ;
+            wordinfo.push( val['word'] );
 
         });
+        // draw overview
+        var olen = Math.round(wdata.length / 5) ;
+        overview = $.plot($("#overview"), 
+            [{data: _.first(_.shuffle(wdata), olen), color: 2}] ,  
+            jQuery.extend(over_opt, xyoptions) );
 
-        //console.log(wordinfo);
-        
+        // now plot the whole graph
         placeholder = $.plot($("#placeholder"), 
-            [{data: prcdata, label: "tags", color: 2}] , 
-            jQuery.extend(placeholder_opt, xyoptions) );
+            [{data: wdata, label: "tags", color: 2}] , 
+            jQuery.extend(placeholder_opt, xyoptions));
+
 
         $("#datacount").text(wordinfo.length);
-
-        // setup overview
-        var over_opt = {
-            legend: { show: true, container: $("#overviewLegend") },
-            series: {
-                points: { show: true, size: .5 },
-                shadowSize: 0
-            },
-            grid: { color: "#999" },
-            selection: { mode: "xy" }
-        } ;
-        overview = $.plot($("#overview"), 
-            [{data: prcdata, color: 2}] ,  jQuery.extend(over_opt, xyoptions));
+        $("#tagnum").text(wordinfo.length);
 
     });
     
     // now connect the two
-    
     $("#placeholder").bind("plotselected", function (event, ranges) {
         // clamp the zooming to prevent eternal zoom
         if (ranges.xaxis.to - ranges.xaxis.from < 1e-3)
@@ -121,12 +155,56 @@ $(function () {
         if (ranges.yaxis.to - ranges.yaxis.from < 1e-3)
             ranges.yaxis.to = ranges.yaxis.from + 1e-3;
         
-        // do the zooming
-        placeholder = $.plot($("#placeholder"), [{data: prcdata, label: "tags", color: 2}], 
+        // do the zooming, get the data again
+        /*
+        placeholder = $.plot($("#placeholder"), [{data: wdata, label: "tags", color: 2}], 
                       $.extend(true, {}, xyoptions, placeholder_opt, {
                           xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
                           yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
                       }));
+        */
+
+        var args=["xfrom="+ranges.xaxis.from.toString(), "xto="+ranges.xaxis.to.toString(), 
+            "yfrom="+ranges.yaxis.from.toString(), "yto="+ranges.yaxis.to.toString()] ;
+
+        var req_url = cgi_path+"?"+args.join("&")
+        console.log(req_url)
+
+        $.getJSON(req_url, function(data) {
+            var tdata=[], tagname=[];
+            $.each(data, function(key, val) {
+                tdata.push( [val['count'], val['infm']] ) ;
+                tagname.push( val['tag'] );
+            });
+            
+            var tlen = tagname.length;
+            console.log("selected area has " + tlen.toString() + " points.")
+            $("#tagnum").text(tlen);
+
+            // now update the whole graph
+            if ( tlen >= 200 ) {
+                placeholder = $.plot($("#placeholder"), 
+                    [{data: tdata, label: "tags", color: 2}] , 
+                    $.extend(true, {}, xyoptions, placeholder_opt, {
+                          xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
+                          yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
+                      }));
+            } 
+            else {
+                console.log(" get to the else branch")
+                /*
+                placeholder.setSelection(ranges);
+                // display tags directly
+                var o;
+
+                o = placeholder.pointOffset({ x: tdata[0][0], y: tdata[0][1]});
+                // append it to the placeholder which Flot already uses for positioning
+                ph_handle.append('<div style="position:absolute;left:' + (o.left + 4) + 'px;top:' + o.top + 'px;color:#f66;font-size:smaller">'+tagname[i]+'</div>');
+                */
+            }
+
+
+        });
         
         // don't fire event on the overview to prevent eternal loop
         overview.setSelection(ranges, true);
@@ -163,11 +241,11 @@ $(function () {
                     $("#tooltip").remove();
                     //var x = item.datapoint[0].toFixed(2),
                     //    y = item.datapoint[1].toFixed(2);
-                    var x = wordinfo[ii][1],
-                        y = wordinfo[ii][2];
+                    var x = wdata[ii][0],
+                        y = wdata[ii][1];
                     
                     showTooltip(item.pageX, item.pageY,
-                                wordinfo[ii][0] + " (" + x + ", " + y +")");
+                                wordinfo[ii] + " (" + x + ", " + y +")");
                 }
             }
             else {
@@ -180,7 +258,7 @@ $(function () {
     $("#placeholder").bind("plotclick", function (event, pos, item) {
         if (item) {
             var ii = item.dataIndex;
-            $("#clickdata").text(item.series.label + ' "'+ wordinfo[ii][0] + '": (' + wordinfo[ii][1]+", "+ wordinfo[ii][2].toFixed(2) + ") ");
+            $("#clickdata").text(item.series.label + ' "'+ wordinfo[ii] + '": (' + wdata[ii][0]+", "+ wdata[ii][1].toFixed(2) + ") ");
             //plot.highlight(item.series, item.datapoint);
         }
     });
