@@ -55,6 +55,7 @@ $(function () {
     var cgi_path="/tag-explore/cgi-bin/tag_data.py"
     var wordinfo = [];
     var wdata = [];
+    var tdata=[], tagname=[];
 
     var xyoptions = { xaxis: {
                         min: 5,
@@ -94,31 +95,6 @@ $(function () {
     var overview;
     var ph_handle = $("#placeholder"); //plot area handle?
 
-    // fetch data with jQuery + python cgi
-    /*
-    function onDataReceived(series) {
-        // extract the first coordinate pair so you can see that
-        // data is now an ordinary Javascript object
-        var firstcoordinate = '(' + series.data[0][0] + ', ' + series.data[0][1] + ')';
-
-        button.siblings('span').text('Fetched ' + series.label + ', first point: ' + firstcoordinate);
-
-        // let's add it to our current data
-        if (!alreadyFetched[series.label]) {
-            alreadyFetched[series.label] = true;
-            data.push(series);
-        }
-        
-        // and plot all we got
-        $.plot(placeholder, data, options);
-     }
-    
-    $.ajax({
-        url: dataurl,
-        method: 'GET',
-        dataType: 'json',
-        success: onDataReceived
-    }); */
 
     // get initial data and setup graph
     $.getJSON('wordnet_tag.json', function(data) {
@@ -171,7 +147,7 @@ $(function () {
         console.log(req_url)
 
         $.getJSON(req_url, function(data) {
-            var tdata=[], tagname=[];
+            tdata=[], tagname=[];
             $.each(data, function(key, val) {
                 tdata.push( [val['count'], val['infm']] ) ;
                 tagname.push( val['tag'] );
@@ -241,11 +217,19 @@ $(function () {
                     $("#tooltip").remove();
                     //var x = item.datapoint[0].toFixed(2),
                     //    y = item.datapoint[1].toFixed(2);
-                    var x = wdata[ii][0],
+                    var x, y, tw;
+                    if (ii < tdata.length){
+                        x = tdata[ii][0];
+                        y = tdata[ii][1];
+                        tw = tagname[ii];
+                    } else {
+                        x = wdata[ii][0];
                         y = wdata[ii][1];
+                        tw = wordinfo[ii];
+                    }
                     
                     showTooltip(item.pageX, item.pageY,
-                                wordinfo[ii] + " (" + x + ", " + y +")");
+                                tw + " (" + x + ", " + y +")");
                 }
             }
             else {
@@ -258,7 +242,17 @@ $(function () {
     $("#placeholder").bind("plotclick", function (event, pos, item) {
         if (item) {
             var ii = item.dataIndex;
-            $("#clickdata").text(item.series.label + ' "'+ wordinfo[ii] + '": (' + wdata[ii][0]+", "+ wdata[ii][1].toFixed(2) + ") ");
+            var x, y, tw;
+            if (ii < tdata.length){
+                x = tdata[ii][0];
+                y = tdata[ii][1];
+                tw = tagname[ii];
+            } else {
+                x = wdata[ii][0];
+                y = wdata[ii][1];
+                tw = wordinfo[ii];
+            }
+            $("#clickdata").text(item.series.label + ' "'+ tw + '": (' + x +", "+ y.toFixed(2) + ") ");
             //plot.highlight(item.series, item.datapoint);
         }
     });
