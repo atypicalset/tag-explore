@@ -67,7 +67,18 @@ $(function () {
                         inverseTransform: function (v) { return Math.exp(v); },
                         tickDecimals: 2,
                     } } ;
-    // get data and setup graph
+    var placeholder_opt = {
+           series: {
+               points: { show: true }
+           },
+           grid: { hoverable: true, clickable: true },
+           selection: { mode: "xy" },
+        } ;
+    
+    var placeholder;
+    var overview;
+
+    // get initial data and setup graph
     $.getJSON('wordnet_tag.json', function(data) {
         //var items = [];
 
@@ -79,15 +90,10 @@ $(function () {
         });
 
         //console.log(wordinfo);
-        var cur_opt = {
-           series: {
-               points: { show: true }
-           },
-           grid: { hoverable: true, clickable: true },
-           selection: { mode: "xy" },
-        } ;
-        var placeholder = $.plot($("#placeholder"), 
-            [{data: prcdata, label: "tags", color: 2}] , jQuery.extend(cur_opt, xyoptions));
+        
+        placeholder = $.plot($("#placeholder"), 
+            [{data: prcdata, label: "tags", color: 2}] , 
+            jQuery.extend(placeholder_opt, xyoptions) );
 
         $("#datacount").text(wordinfo.length);
 
@@ -95,17 +101,39 @@ $(function () {
         var over_opt = {
             legend: { show: true, container: $("#overviewLegend") },
             series: {
-                points: { show: true, size: 1 },
+                points: { show: true, size: .5 },
                 shadowSize: 0
             },
             grid: { color: "#999" },
             selection: { mode: "xy" }
         } ;
-        var overview = $.plot($("#overview"), 
+        overview = $.plot($("#overview"), 
             [{data: prcdata, color: 2}] ,  jQuery.extend(over_opt, xyoptions));
 
     });
-
+    
+    // now connect the two
+    
+    $("#placeholder").bind("plotselected", function (event, ranges) {
+        // clamp the zooming to prevent eternal zoom
+        if (ranges.xaxis.to - ranges.xaxis.from < 1e-3)
+            ranges.xaxis.to = ranges.xaxis.from + 1e-3;
+        if (ranges.yaxis.to - ranges.yaxis.from < 1e-3)
+            ranges.yaxis.to = ranges.yaxis.from + 1e-3;
+        
+        // do the zooming
+        placeholder = $.plot($("#placeholder"), [{data: prcdata, label: "tags", color: 2}], 
+                      $.extend(true, {}, xyoptions, placeholder_opt, {
+                          xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
+                          yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
+                      }));
+        
+        // don't fire event on the overview to prevent eternal loop
+        overview.setSelection(ranges, true);
+    });
+    $("#overview").bind("plotselected", function (event, ranges) {
+        placeholder.setSelection(ranges);
+    });
 
     // respond to clicking and hovering
     function showTooltip(x, y, contents) {
