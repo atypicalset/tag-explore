@@ -24,7 +24,7 @@
     <table width=900>
         <tr>
             <td rowspan="5">
-                <div id="placeholder" style="width:600px;height:500px"></div>
+                <div id="placeholder" style="width:600px;height:400px"></div>
             </td>
             <td><div id="overview" style="width:200px;height:150px"></div>
             </td>
@@ -64,7 +64,7 @@ $(function () {
                         inverseTransform: function (v) { return Math.exp(v); },
                         tickDecimals: 0 ,
                     } ,
-                    yaxis: { 
+                    yaxis: {
                         min: 0.35,
                         max: 4.1,
                         tickDecimals: 2,
@@ -93,7 +93,6 @@ $(function () {
     
     var placeholder; //plot handles
     var overview;
-    var ph_handle = $("#placeholder"); //plot area handle?
 
 
     // get initial data and setup graph
@@ -157,34 +156,40 @@ $(function () {
             console.log("selected area has " + tlen.toString() + " points.")
             $("#tagnum").text(tlen);
 
+
             // now update the whole graph
-            if ( tlen >= 200 ) {
-                placeholder = $.plot($("#placeholder"), 
-                    [{data: tdata, label: "tags", color: 2}] , 
+            placeholder = $.plot($("#placeholder"), 
+                    [{data: tdata, label: "tags", color: "#c44"}] , 
                     $.extend(true, {}, xyoptions, placeholder_opt, {
                           xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
-                          yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
+                          yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }, 
+                          series: {points: {radius: 3, linewidth:1} }
                       }));
-            } 
-            else {
-                console.log(" get to the else branch")
-                /*
-                placeholder.setSelection(ranges);
+            
+            // put the text in the bottom 
+            if ( tlen < 200){
+                console.log(" now try to display text ")
+                
+                //placeholder.setSelection(ranges);
                 // display tags directly
+                var p_area = $("#placeholder"); //plot area handle
+
                 var o;
-
-                o = placeholder.pointOffset({ x: tdata[0][0], y: tdata[0][1]});
-                // append it to the placeholder which Flot already uses for positioning
-                ph_handle.append('<div style="position:absolute;left:' + (o.left + 4) + 'px;top:' + o.top + 'px;color:#f66;font-size:smaller">'+tagname[i]+'</div>');
-                */
+                for (i=0; i < tagname.length; i++){
+                    o = placeholder.pointOffset({ x: tdata[i][0], y: tdata[i][1]});
+                    // append it to the placeholder which Flot already uses for positioning
+                    p_area.append('<div style="position:absolute;left:' + (o.left + 4) + 'px;top:' + o.top + 'px;color:#d55;font-size:smaller">'+tagname[i]+'</div>');
+                }
+                
             }
-
+            
 
         });
         
         // don't fire event on the overview to prevent eternal loop
         overview.setSelection(ranges, true);
     });
+
     $("#overview").bind("plotselected", function (event, ranges) {
         placeholder.setSelection(ranges);
     });
