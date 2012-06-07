@@ -16,38 +16,43 @@
     <script language="javascript" type="text/javascript" src="../js/underscore.js"></script>
     <script language="javascript" type="text/javascript" src="../flot/jquery.flot.js"></script>
     <script language="javascript" type="text/javascript" src="../flot/jquery.flot.selection.js"></script>
-    <!--<script language="javascript" type="text/javascript" src="../flot/jquery.flot.navigate.js"></script>-->
+
     </head>
     <body>
-    <h2>Scatter plot: Tag frequency vs Informativeness</h2>
+    <!--<h2>Scatter plot: Tag frequency vs Informativeness</h2>-->
 
     <table width=900>
         <tr>
-            <td rowspan="5">
+            <td> (<span id="x">0</span>, <span id="y">0</span>) </td>
+            <td> <span id="datacount">0</span> tags loaded,  <br />
+                <span id="tagnum">inf</span> points shown.
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="3">
                 <div id="placeholder" style="width:600px;height:400px"></div>
             </td>
-            <td><div id="overview" style="width:200px;height:150px"></div>
+            <td>                
+                <div id="overview" style="width:200px;height:150px"></div>
             </td>
         </tr>
-        <tr><td><span id="datacount">0</span> tags loaded.</td></tr>
+        <tr><td>
+            <span id="clickdata"></span>
+        </td></tr>
+        <tr><td>
+            <div id="wnetbar" style="width:200px;height:200px"></div>
+        </td></tr>
         <tr><td><p><input id="enableTooltip" type="checkbox">Enable tooltip</p></td></tr>
-        <tr><td><span id="clickdata"></span></td></tr>
-        <tr>
-            <td>
-                <p id="hoverdata">Mouse hovers at
-                (<span id="x">0</span>, <span id="y">0</span>).</p>
-                <p id="selectdata">selected area has <span id="tagnum">inf</span> points</p>
-            </td>
-        </tr>
+        
         </tr>
     
     </table>
     
-    <p>Try
+    <!--<p>Try
     pointing and clicking on the points.</p>
 
     <p>A tooltip is easy to build with a bit of jQuery code and the
-    data returned from the plot.</p>
+    data returned from the plot.</p> -->
 
 
 <script type="text/javascript">
@@ -259,6 +264,31 @@ $(function () {
             }
             $("#clickdata").text(item.series.label + ' "'+ tw + '": (' + x +", "+ y.toFixed(2) + ") ");
             //plot.highlight(item.series, item.datapoint);
+
+            // plot most related synsets
+            // URL example http://localhost/demo/tag-explore/cgi-bin/tag_data.py?q=muffin&dataformat=wn
+            var args = ["dataformat=wn", "q="+tw];
+            var req_url = cgi_path+"?"+args.join("&") ;
+            console.log(req_url)
+            $.getJSON(req_url, function(data) {
+                var wcnt=[], wprc=[], ww=[];
+                var cnt=0, tmpcnt, tmpprc ;
+                $.each(data, function(key, val) {
+                    tmpprc = parseFloat(val["prct"]) ;
+                    cnt += 1;
+                    if (tmpprc >= 0.01) {
+                        tmpcnt = parseInt(val["count"]) ;
+                        wcnt.push( tmpcnt );
+                        wprc.push( tmpprc ) ;
+                        ww.push( val['words'].substring(0,20) ); 
+                    }
+                });
+                
+                var wlen = wcnt.length;
+                console.log("selected tag has " + cnt.toString() + " synsets, kept "+ wlen.toString() )
+                //console.log(ww)
+            });
+
         }
     });
 
