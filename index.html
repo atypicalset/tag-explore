@@ -16,6 +16,7 @@
     <script language="javascript" type="text/javascript" src="../js/underscore.js"></script>
     <script language="javascript" type="text/javascript" src="../flot/jquery.flot.js"></script>
     <script language="javascript" type="text/javascript" src="../flot/jquery.flot.selection.js"></script>
+    <script language="javascript" type="text/javascript" src="../flot/jquery.flot.axislabels.js"></script>
 
     </head>
     <body>
@@ -30,7 +31,7 @@
         </tr>
         <tr>
             <td rowspan="3">
-                <div id="placeholder" style="width:600px;height:400px"></div>
+                <div id="placeholder" style="width:500px;height:500px"></div>
             </td>
             <td>                
                 <div id="overview" style="width:200px;height:150px"></div>
@@ -40,7 +41,8 @@
             <span id="clickdata"></span>
         </td></tr>
         <tr><td>
-            <div id="wnetbar" style="width:200px;height:200px"></div>
+            <div id="wnetcnt" style="width:300px;height:150px"></div>
+            <div id="wnetprc" style="width:300px;height:150px"></div>
         </td></tr>
         <tr><td><p><input id="enableTooltip" type="checkbox">Enable tooltip</p></td></tr>
         
@@ -118,7 +120,7 @@ $(function () {
 
         // now plot the whole graph
         placeholder = $.plot($("#placeholder"), 
-            [{data: wdata, label: "tags", color: 2}] , 
+            [{data: wdata, label: "tag", color: 2}] , 
             jQuery.extend(placeholder_opt, xyoptions));
 
 
@@ -248,7 +250,9 @@ $(function () {
             }
         }
     });
-
+    
+    var wcnt=[], wprc=[], ww=[]; 
+    var wnetbar, wnetprc;
     $("#placeholder").bind("plotclick", function (event, pos, item) {
         if (item) {
             var ii = item.dataIndex;
@@ -271,26 +275,66 @@ $(function () {
             var req_url = cgi_path+"?"+args.join("&") ;
             console.log(req_url)
             $.getJSON(req_url, function(data) {
-                var wcnt=[], wprc=[], ww=[];
-                var cnt=0, tmpcnt, tmpprc ;
+                //var wcnt=[], wprc=[], ww=[]; these are now global var
+                var cnt=0, vcnt=0, tmpcnt, tmpprc ;
                 $.each(data, function(key, val) {
                     tmpprc = parseFloat(val["prct"]) ;
+                    tmpcnt = parseInt(val["count"]) ;
                     cnt += 1;
-                    if (tmpprc >= 0.01) {
-                        tmpcnt = parseInt(val["count"]) ;
-                        wcnt.push( tmpcnt );
-                        wprc.push( tmpprc ) ;
+                    if (vcnt<=50 && (tmpprc >= 0.01 || tmpcnt >= 5) ) {
+                        wcnt.push( [vcnt, tmpcnt] );
+                        wprc.push( [vcnt, tmpprc] ) ;
                         ww.push( val['words'].substring(0,20) ); 
+                        vcnt += 1;
                     }
                 });
                 
                 var wlen = wcnt.length;
                 console.log("selected tag has " + cnt.toString() + " synsets, kept "+ wlen.toString() )
                 //console.log(ww)
+                var opt = { 
+                            bars: { show: true },
+                        };
+                // now plot the bars
+                wnetbar = $.plot($("#wnetcnt"), [{ data: wcnt}], opt);
+                wnetprc = $.plot($("#wnetprc"), [{ data: wprc}], opt);
             });
 
-        }
+        };
     });
+    
+    var previousBar = null;
+    function (event, pos, item) {
+        if ($("#enableTooltip:checked").length > 0) {
+            if (item) {
+                if (previousBar != item.dataIndex) {
+                    previousBar = item.dataIndex;
+                    var ii = item.dataIndex;
+
+                    $("#bartip").remove();
+                    //var x = item.datapoint[0].toFixed(2),
+                    //    y = item.datapoint[1].toFixed(2);
+                    var x, y, tw;
+                    if (ii < tdata.length){
+                        x = tdata[ii][0];
+                        y = tdata[ii][1];
+                        tw = tagname[ii];
+                    } else {
+                        x = wdata[ii][0];
+                        y = wdata[ii][1];
+                        tw = wordinfo[ii];
+                    }
+                    
+                    showTooltip(item.pageX, item.pageY,
+                                tw + " (" + x + ", " + y +")");
+                }
+            }
+            else {
+                $("#bartip").remove();
+                previousBar = null;            
+            }
+        }
+    }
 
 });
 </script>
