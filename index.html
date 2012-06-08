@@ -6,7 +6,7 @@
     <!-- <link href="layout.css" rel="stylesheet" type="text/css"> -->
     <style type="text/css">
     body {
-      font-family: sans-serif;
+      font-family: verdana;
       font-size: 16px;
       margin: 50px;
       max-width: 800px;
@@ -24,9 +24,16 @@
 
     <table width=900>
         <tr>
-            <td> (<span id="x">0</span>, <span id="y">0</span>) </td>
-            <td> <span id="datacount">0</span> tags loaded,  <br />
-                <span id="tagnum">inf</span> points shown.
+            <td>
+                <input id="enableTooltip" type="checkbox" checked="checked">show tooltip</input>
+                <font size=-1> 
+                    pointer position (<span id="x">0</span>, <span id="y">0</span>)
+                </font>
+            </td>
+            <td>
+                <font size=-1>
+                    <span id="tagnum">0</span> tags shown, <span id="datacount">0</span> total
+                </font>
             </td>
         </tr>
         <tr>
@@ -34,17 +41,16 @@
                 <div id="placeholder" style="width:500px;height:500px"></div>
             </td>
             <td>                
-                <div id="overview" style="width:200px;height:150px"></div>
+                <div id="overview" style="width:150px;height:120px"></div>
             </td>
         </tr>
         <tr><td>
-            <span id="clickdata"></span>
+            <b><span id="clicktag">select a tag for more info</span></b> <span id="clickdata"></span>
         </td></tr>
         <tr><td>
-            <div id="wnetcnt" style="width:300px;height:150px"></div>
-            <div id="wnetprc" style="width:300px;height:150px"></div>
+            <div id="wnetcnt" style="width:360px;height:180px"></div>
+            <div id="wnetprc" style="width:360px;height:180px"></div>
         </td></tr>
-        <tr><td><p><input id="enableTooltip" type="checkbox">Enable tooltip</p></td></tr>
         
         </tr>
     
@@ -101,6 +107,10 @@ $(function () {
     var placeholder; //plot handles
     var overview;
 
+    //$("#enableTooltip")['checked'] = "checked"; // enable tooltip by default
+    //console.log($("#enableTooltip:checked"))
+
+    var previousPoint = null, previousPointHighlight = null;
 
     // get initial data and setup graph
     $.getJSON('wordnet_tag.json', function(data) {
@@ -166,16 +176,16 @@ $(function () {
 
             // now update the whole graph
             placeholder = $.plot($("#placeholder"), 
-                    [{data: tdata, label: "tags", color: "#c44"}] , 
+                    [{data: tdata, label: "tag", color: "#c44"}] , 
                     $.extend(true, {}, xyoptions, placeholder_opt, {
                           xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
                           yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }, 
                           series: {points: {radius: 3, linewidth:1} }
                       }));
-            
+            previousPointHighlight = null; //reset highlight
             // put the text in the bottom 
             if ( tlen < 200){
-                console.log(" now try to display text ")
+                //console.log(" now try to display text ")
                 
                 //placeholder.setSelection(ranges);
                 // display tags directly
@@ -202,8 +212,8 @@ $(function () {
     });
 
     // respond to clicking and hovering
-    function showTooltip(x, y, contents) {
-        $('<div id="tooltip">' + contents + '</div>').css( {
+    function showTooltip(x, y, contents, divid) {
+        $('<div id="'+divid+'">' + contents + '</div>').css( {
             position: 'absolute',
             display: 'none',
             top: y + 5,
@@ -215,7 +225,6 @@ $(function () {
         }).appendTo("body").fadeIn(200);
     } ;
 
-    var previousPoint = null;
     $("#placeholder").bind("plothover", function (event, pos, item) {
         $("#x").text(pos.x.toFixed(2));
         $("#y").text(pos.y.toFixed(2));
@@ -241,7 +250,7 @@ $(function () {
                     }
                     
                     showTooltip(item.pageX, item.pageY,
-                                tw + " (" + x + ", " + y +")");
+                                tw + " (" + x + ", " + y +")", "tooltip");
                 }
             }
             else {
@@ -255,6 +264,12 @@ $(function () {
     var wnetbar, wnetprc;
     $("#placeholder").bind("plotclick", function (event, pos, item) {
         if (item) {
+            if ( previousPointHighlight != item.dataIndex) {
+                    if (previousPointHighlight){
+                        placeholder.unhighlight(item.series, previousPointHighlight);
+                    }
+                    previousPointHighlight = item.dataIndex;
+                }
             var ii = item.dataIndex;
             var x, y, tw;
             if (ii < tdata.length){
@@ -266,10 +281,15 @@ $(function () {
                 y = wdata[ii][1];
                 tw = wordinfo[ii];
             }
-            $("#clickdata").text(item.series.label + ' "'+ tw + '": (' + x +", "+ y.toFixed(2) + ") ");
-            //plot.highlight(item.series, item.datapoint);
+            $("#clicktag").text('"'+tw+'"');
+            $("#clickdata").text( 'count=' + x +", informativeness="+ y.toFixed(2) );
+
+            placeholder.highlight(item.series, item.datapoint);
 
             // plot most related synsets
+            $('#wnetcnt').empty();
+            $('#wnetprc').empty(); // clear the bars
+            wcnt=[], wprc=[], ww=[]; //clear the data too
             // URL example http://localhost/demo/tag-explore/cgi-bin/tag_data.py?q=muffin&dataformat=wn
             var args = ["dataformat=wn", "q="+tw];
             var req_url = cgi_path+"?"+args.join("&") ;
@@ -294,6 +314,7 @@ $(function () {
                 //console.log(ww)
                 var opt = { 
                             bars: { show: true },
+                            grid: { hoverable: true, clickable: true },
                         };
                 // now plot the bars
                 wnetbar = $.plot($("#wnetcnt"), [{ data: wcnt}], opt);
@@ -304,7 +325,8 @@ $(function () {
     });
     
     var previousBar = null;
-    function (event, pos, item) {
+    function ShowBarTips(event, pos, item) {
+
         if ($("#enableTooltip:checked").length > 0) {
             if (item) {
                 if (previousBar != item.dataIndex) {
@@ -312,21 +334,17 @@ $(function () {
                     var ii = item.dataIndex;
 
                     $("#bartip").remove();
-                    //var x = item.datapoint[0].toFixed(2),
-                    //    y = item.datapoint[1].toFixed(2);
+
                     var x, y, tw;
-                    if (ii < tdata.length){
-                        x = tdata[ii][0];
-                        y = tdata[ii][1];
-                        tw = tagname[ii];
-                    } else {
-                        x = wdata[ii][0];
-                        y = wdata[ii][1];
-                        tw = wordinfo[ii];
-                    }
+                    
+                    x = wcnt[ii][1];
+                    y = (wprc[ii][1]*100).toFixed(1);
+                    tw = ww[ii];
+
+                    console.log("cnt="+x+", prc="+y+", words='" + tw +"' ");
                     
                     showTooltip(item.pageX, item.pageY,
-                                tw + " (" + x + ", " + y +")");
+                                '"'+tw + '.." #imgs' + x + ", " + y +"%", "bartip");
                 }
             }
             else {
@@ -335,6 +353,9 @@ $(function () {
             }
         }
     }
+
+    $("#wnetcnt").bind("plothover", ShowBarTips);
+    $("#wnetprc").bind("plothover", ShowBarTips);
 
 });
 </script>
