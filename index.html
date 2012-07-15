@@ -304,7 +304,7 @@ $(function () {
                     if (vcnt<=50 && (tmpprc >= 0.01 || tmpcnt >= 5) ) {
                         wcnt.push( [vcnt, tmpcnt] );
                         wprc.push( [vcnt, tmpprc] ) ;
-                        ww.push( val['words'].substring(0,20) ); 
+                        ww.push( val['words'].substring(0,50) ); 
                         vcnt += 1;
                     }
                 });
@@ -344,7 +344,7 @@ $(function () {
                     console.log("cnt="+x+", prc="+y+", words='" + tw +"' ");
                     
                     showTooltip(item.pageX, item.pageY,
-                                '"'+tw + '.." #imgs' + x + ", " + y +"%", "bartip");
+                                '"'+tw + '.." #' + x + ", " + y +"%", "bartip");
                 }
             }
             else {
