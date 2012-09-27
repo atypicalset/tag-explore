@@ -10,7 +10,7 @@ import json
 import cgitb
 cgitb.enable()
 
-db_file = "./taginfo.db"
+db_file = "./taginfo_v2.db"
 db_wordnet = "./wordnet_tag.db"
 
 # Create instance of FieldStorage 
@@ -24,6 +24,10 @@ xfrom = float(form.getvalue('xfrom')) if form.getvalue('xfrom') else []
 xto = float(form.getvalue('xto')) if form.getvalue('xto') else []
 yfrom = float(form.getvalue('yfrom')) if form.getvalue('yfrom') else []
 yto = float(form.getvalue('yto')) if form.getvalue('yto') else []
+# tag type args
+pos = form.getvalue('pos') if form.getvalue('pos') else []
+typefilter = form.getvalue('typefilter') if form.getvalue('typefilter') else []
+# debug print on browser
 DEBUG_TEST = int(form.getvalue('debug')) if form.getvalue('debug') else []
 
 print "Content-Type: text/plain;charset=utf-8"
@@ -58,7 +62,30 @@ if df == 'tagf':
 			print " %d data points found " % len(result)
 		print json.dumps(result, sort_keys=True, indent=4)
 	else:
-		print "DO NOT know how to get data, QUIT!"
+		print "{status: DO NOT know how to get data, QUIT!}"
+
+	conn.close()
+elif df =="tt": # get tag type
+	conn = sqlite3.connect(db_file)
+	cursor = conn.cursor()
+	failed = False
+	if pos:
+		stmt = "SELECT S.tag, W.min_depth FROM tag_score S, tag_wn W " + \
+			" WHERE W.pos=? AND S.id=W.tagid ORDER BY W.min_depth" 
+		cursor.execute(stmt, (pos,))
+	elif typefilter:
+		stmt = "SELECT tag, %s FROM tag_type WHERE %s=1 " % (typefilter,typefilter)
+		cursor.execute(stmt)
+	else:
+		failed = True
+	
+	if not failed:
+		result = map(lambda t: {'tag': t[0], 'flag': int(t[1])}, cursor)
+		if DEBUG_TEST:
+			print " %d data points found " % len(result)
+		print json.dumps(result, sort_keys=False, indent=4)
+	else:
+		print "{status: DO NOT know how to get data, QUIT!}"
 
 	conn.close()
 
@@ -79,11 +106,11 @@ elif df=="wn":
 			print " %d data points found " % len(result)
 		print json.dumps(result, sort_keys=True, indent=4)
 	else:
-		print "DO NOT know how to get data, QUIT!"
+		print "{status:DO NOT know how to get data, QUIT!}"
 
 	conn.close()
 else:
-	print "DO NOT know how to get data, QUIT!"
+	print "{status:DO NOT know how to get data, QUIT!}"
 
 
 
